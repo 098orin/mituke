@@ -29,7 +29,7 @@ class VoskSink(AudioSink):
         self.last_edit = {}
 
     def wants_opus(self) -> bool:
-        return False  # We want PCM
+        return False
 
     def write(self, user, data):
         if user is None:
