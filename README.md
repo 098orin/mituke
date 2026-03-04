@@ -13,7 +13,7 @@ VC での会話をテキスト化して、Discord に送る Discord bot
 uv --version
 ```
 
----
+
 
 ## 2. 仮想環境の作成
 
@@ -21,7 +21,7 @@ uv --version
 uv venv
 ```
 
----
+
 
 ## 3. 依存関係のインストール
 
@@ -29,7 +29,7 @@ uv venv
 uv sync
 ```
 
----
+
 
 ## 4. 仮想環境の有効化
 
@@ -45,7 +45,7 @@ uv sync
 source .venv/bin/activate
 ```
 
----
+
 
 ## 5. プロジェクトの実行
 
@@ -53,7 +53,7 @@ source .venv/bin/activate
 uv run python main.py
 ```
 
----
+
 
 依存関係を追加する:
 
