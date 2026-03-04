@@ -11,5 +11,5 @@ VC での会話をテキスト化して、Discord に送る Discord bot
 ## 2. 実行
 
 ```bash
-uv run python main.py
+uv run python src/main.py
 ```
