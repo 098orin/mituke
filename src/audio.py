@@ -1,15 +1,24 @@
 import audioop
 import json
+import os
 import time
 
 from discord.ext.voice_recv import AudioSink
+from dotenv import load_dotenv
 from rich.console import Console
 from vosk import KaldiRecognizer, Model
+
+load_dotenv()
+
+MODEL_PATH = os.getenv("MODEL_PATH")
+
+if MODEL_PATH is None:
+    raise RuntimeError("MODEL_PATH is not set")
 
 console = Console()
 
 
-model = Model("models/vosk-model-small-ja")
+model = Model(MODEL_PATH)
 
 
 class VoskSink(AudioSink):
