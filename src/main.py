@@ -2,8 +2,11 @@ import os
 
 import discord
 from discord.ext import commands
+from discord.ext.voice_recv import VoiceRecvClient
 from dotenv import load_dotenv
 from rich.console import Console
+
+from audio import VoskSink
 
 load_dotenv()
 
@@ -12,10 +15,12 @@ TOKEN = os.getenv("DISCORD_TOKEN")
 if TOKEN is None:
     raise RuntimeError("DISCORD_TOKEN is not set")
 
+
 console = Console()
 
 intents = discord.Intents.default()
 intents.message_content = True
+intents.members = True
 intents.voice_states = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
@@ -35,7 +40,9 @@ async def join(ctx: commands.Context):
 
     channel = voice_state.channel
 
-    await channel.connect()
+    vc = await channel.connect(cls=VoiceRecvClient)
+    vc.listen(VoskSink(ctx.channel))
+
     await ctx.send(f"Joined {channel.name}!")
 
 
