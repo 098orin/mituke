@@ -8,7 +8,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from mituke.transcription.sink import TranscriptionSink
-from mituke.transcription.state import MessageState
+from mituke.transcription.state import MessageState, RecognitionTask
 
 
 class FakeRecognizer:
@@ -144,13 +144,17 @@ class TranscriptionSinkTests(unittest.IsolatedAsyncioTestCase):
             user,
             SimpleNamespace(pcm=tail_pcm, packet=SimpleNamespace(ssrc=42)),
         )
+        sink.write(
+            user,
+            SimpleNamespace(pcm=tail_pcm, packet=SimpleNamespace(ssrc=42)),
+        )
 
         await asyncio.wait_for(sink.wait_for_idle(), 1)
 
         state = sink.recognition_states[1]
         recognizer = state.recognizer
 
-        self.assertEqual(recognizer.accept_calls, [lead_pcm + tail_pcm])
+        self.assertEqual(recognizer.accept_calls, [lead_pcm + tail_pcm + tail_pcm])
         self.assertEqual(len(self.text_channel.messages), 1)
         self.assertEqual(self.text_channel.messages[0].content, "Alice: あとから")
         self.assertEqual(
@@ -172,6 +176,20 @@ class TranscriptionSinkTests(unittest.IsolatedAsyncioTestCase):
 
         user = SimpleNamespace(id=1, display_name="Alice", bot=False)
         sink.on_voice_member_speaking_start(user)
+        sink.write(
+            user,
+            SimpleNamespace(
+                pcm=self._make_pcm(1200),
+                packet=SimpleNamespace(ssrc=42),
+            ),
+        )
+        sink.write(
+            user,
+            SimpleNamespace(
+                pcm=self._make_pcm(1200),
+                packet=SimpleNamespace(ssrc=42),
+            ),
+        )
         sink.write(
             user,
             SimpleNamespace(
@@ -217,12 +235,47 @@ class TranscriptionSinkTests(unittest.IsolatedAsyncioTestCase):
         sink.request_stop()
         await sink.wait_closed()
 
+    async def test_brief_noise_does_not_trigger_transcription_start(self) -> None:
+        sink = TranscriptionSink(
+            text_channel=self.text_channel,
+            recognizer=self.recognizer_factory,
+            loop=self.loop,
+        )
+
+        user = SimpleNamespace(id=1, display_name="Alice", bot=False)
+        noise = SimpleNamespace(
+            pcm=self._make_pcm(350),
+            packet=SimpleNamespace(ssrc=42),
+        )
+        speech = SimpleNamespace(
+            pcm=self._make_pcm(1200),
+            packet=SimpleNamespace(ssrc=42),
+        )
+
+        sink.write(user, noise)
+        await asyncio.wait_for(sink.wait_for_idle(), 1)
+
+        recognizer = sink.recognition_states[1].recognizer
+        self.assertEqual(recognizer.accept_calls, [])
+        self.assertEqual(self.text_channel.messages, [])
+
+        sink.write(user, speech)
+        sink.write(user, speech)
+        sink.write(user, speech)
+        await asyncio.wait_for(sink.wait_for_idle(), 1)
+
+        self.assertEqual(recognizer.accept_calls, [speech.pcm * 3])
+        self.assertEqual(len(self.text_channel.messages), 1)
+        self.assertEqual(self.text_channel.messages[0].content, "Alice: あとから")
+
+        sink.request_stop()
+        await sink.wait_closed()
+
     async def test_brief_pause_keeps_same_transcription_session(self) -> None:
         sink = TranscriptionSink(
             text_channel=self.text_channel,
             recognizer=self.recognizer_factory,
             loop=self.loop,
-            speech_stop_grace_period=0.05,
         )
 
         user = SimpleNamespace(id=1, display_name="Alice", bot=False)
@@ -231,14 +284,24 @@ class TranscriptionSinkTests(unittest.IsolatedAsyncioTestCase):
         )
 
         sink.write(user, audio)
+        sink.write(user, audio)
+        sink.write(user, audio)
         await asyncio.wait_for(sink.wait_for_idle(), 1)
+        previous_token = sink.recognition_states[1].activity_token
 
         sink.on_voice_member_speaking_stop(user)
-        await asyncio.sleep(0.02)
         sink.on_voice_member_speaking_start(user)
         sink.write(user, audio)
         await asyncio.wait_for(sink.wait_for_idle(), 1)
-        await asyncio.sleep(0.06)
+
+        sink._process_stop_timeout(
+            RecognitionTask(
+                kind="stop_timeout",
+                user_id=1,
+                display_name="Alice",
+                token=previous_token,
+            )
+        )
         await asyncio.wait_for(sink.wait_for_idle(), 1)
 
         self.assertEqual(len(self.text_channel.messages), 1)

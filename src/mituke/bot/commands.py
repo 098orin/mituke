@@ -29,6 +29,13 @@ async def start_listening(
         await ctx.send(messages.VOICE_CHANNEL_REQUIRED)
         return
 
+    try:
+        recognizer = VoskRecognizer(model_path=settings.vosk_model_path)
+    except Exception as error:
+        handle_listen_error(error)
+        await ctx.send(messages.vosk_model_load_failed())
+        return
+
     target_channel = voice_state.channel
     voice_client = ctx.guild.voice_client
 
@@ -57,7 +64,7 @@ async def start_listening(
 
     sink = TranscriptionSink(
         text_channel=ctx.channel,
-        recognizer=VoskRecognizer(model_path=settings.vosk_model_path),
+        recognizer=recognizer,
         loop=asyncio.get_running_loop(),
     )
 

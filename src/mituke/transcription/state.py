@@ -24,6 +24,7 @@ class RecognitionState:
     partial_text: str = ""
     last_partial_sent_at: float = 0.0
     resample_state: Any = None
+    pre_start_pcm: bytearray = field(default_factory=bytearray)
     start_announced: bool = False
     activity_token: int = 0
 

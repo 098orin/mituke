@@ -14,6 +14,8 @@ from rich.console import Console
 
 from mituke.transcription.audio import (
     PCM_SAMPLE_WIDTH_BYTES,
+    VOICE_ACTIVITY_START_MIN_FRAMES,
+    VOSK_SAMPLE_RATE,
     convert_pcm_48khz_stereo_to_16khz_mono,
     trim_leading_silence,
 )
@@ -29,6 +31,7 @@ PENDING_AUDIO_MAX_BYTES = (
     Decoder.SAMPLING_RATE * Decoder.CHANNELS * PCM_SAMPLE_WIDTH_BYTES
 )
 SPEECH_STOP_GRACE_SECONDS = 0.8
+PRE_START_BUFFER_MAX_BYTES = VOSK_SAMPLE_RATE * PCM_SAMPLE_WIDTH_BYTES
 
 
 class TranscriptionSink(AudioSink):
@@ -193,10 +196,19 @@ class TranscriptionSink(AudioSink):
                 return
 
             if not current_state.start_announced:
-                mono_16khz_pcm = trim_leading_silence(mono_16khz_pcm)
+                current_state.pre_start_pcm.extend(mono_16khz_pcm)
+                if len(current_state.pre_start_pcm) > PRE_START_BUFFER_MAX_BYTES:
+                    del current_state.pre_start_pcm[:-PRE_START_BUFFER_MAX_BYTES]
+
+                mono_16khz_pcm = trim_leading_silence(
+                    bytes(current_state.pre_start_pcm),
+                    min_voiced_frames=VOICE_ACTIVITY_START_MIN_FRAMES,
+                    preroll_frames=0,
+                )
                 if not mono_16khz_pcm:
                     return
 
+                current_state.pre_start_pcm.clear()
                 current_state.start_announced = True
                 should_queue_start = True
 

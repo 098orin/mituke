@@ -33,7 +33,11 @@ def logged_in_as(user: object) -> str:
 
 
 def listen_error(error: Exception) -> str:
-    return f"音声を受信しているときにエラーが発生しました: {error}"
+    return f"音声処理でエラーが発生しました: {error}"
+
+
+def vosk_model_load_failed() -> str:
+    return "音声認識モデルを読み込めませんでした。ログを確認してください。"
 
 
 def command_error(error: Exception) -> str:

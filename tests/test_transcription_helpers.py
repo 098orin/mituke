@@ -126,9 +126,11 @@ class ConvertPcmTests(unittest.TestCase):
 
     def test_detects_voice_activity_from_non_silent_pcm(self) -> None:
         silent_pcm = array("h", [0] * 320).tobytes()
+        noise_pcm = array("h", [350] * 320).tobytes()
         voiced_pcm = array("h", [1200] * 320).tobytes()
 
         self.assertFalse(has_voice_activity(silent_pcm))
+        self.assertFalse(has_voice_activity(noise_pcm))
         self.assertTrue(has_voice_activity(voiced_pcm))
 
     def test_trims_leading_silence_before_first_voiced_frame(self) -> None:
@@ -141,3 +143,15 @@ class ConvertPcmTests(unittest.TestCase):
         )
 
         self.assertEqual(trimmed, voiced_frame)
+
+    def test_requires_sustained_voice_when_min_voiced_frames_is_set(self) -> None:
+        silent_frame = array("h", [0] * 320).tobytes()
+        voiced_frame = array("h", [1600] * 320).tobytes()
+
+        trimmed = trim_leading_silence(
+            silent_frame + voiced_frame + silent_frame,
+            min_voiced_frames=2,
+            preroll_frames=0,
+        )
+
+        self.assertEqual(trimmed, b"")

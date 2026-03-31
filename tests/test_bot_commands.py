@@ -6,6 +6,7 @@ from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 from mituke.bot.commands import show_help, start_listening, stop_listening
+from mituke.bot.messages import vosk_model_load_failed
 from mituke.config import Settings
 
 
@@ -269,6 +270,32 @@ class StartListeningTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(voice_client._ssrc_to_id, {})
         self.assertEqual(voice_client._id_to_ssrc, {})
+
+    async def test_reports_model_load_failure_before_joining_voice(self) -> None:
+        settings = Settings("token", Path("broken-model"), None)
+        handle_listen_error = Mock()
+        target_channel = FakeVoiceChannel("General")
+        ctx = FakeContext(
+            guild=FakeGuild(),
+            author=FakeMember(voice=SimpleNamespace(channel=target_channel)),
+            channel=FakeTextChannel(),
+        )
+
+        with (
+            patch("mituke.bot.commands.discord.Member", FakeMember),
+            patch(
+                "mituke.bot.commands.VoskRecognizer",
+                side_effect=RuntimeError("invalid model"),
+            ),
+        ):
+            await start_listening(ctx, settings, handle_listen_error)
+
+        handle_listen_error.assert_called_once()
+        self.assertEqual(target_channel.connect_calls, [])
+        self.assertEqual(
+            ctx.sent_messages,
+            [vosk_model_load_failed()],
+        )
 
 
 class StopListeningTests(unittest.IsolatedAsyncioTestCase):
